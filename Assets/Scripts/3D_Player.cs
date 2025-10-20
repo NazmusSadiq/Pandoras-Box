@@ -1,50 +1,53 @@
 using System;
 using UnityEngine;
+using System.Collections;
 
 [RequireComponent(typeof(Animator))]
 public class ThreeD_Character : MonoBehaviour
 {
     [Header("Movement")]
-    public float Speed = 2.0f;                // base walk speed
-    public float sprintMultiplier = 2.0f;     // speed multiplier while sprinting
-    public float jumpHeight = 1.5f;           // how high the character jumps
-    public float gravity = 9.81f;             // gravity strength
+    public float Speed = 2.0f;
+    public float sprintMultiplier = 3.0f;
+    public float jumpHeight = 1.5f;
+    public float gravity = 9.81f;
 
-    [Header("Attack / Combo (code-driven)")]
-    public int maxCombo = 4;                  // number of combo attacks (1..4)
-    [Tooltip("Normalized time (0..1) where chaining can begin")]
-    public float comboWindowStart = 0.3f;
-    [Tooltip("Normalized time (0..1) where chaining must finish)")]
-    public float comboWindowEnd = 0.9f;
-    public float transitionDuration = 0.08f;  // animator crossfade duration
-    public float attackRayDistance = 15f;     // raycast distance for attack hit detection
-    public LayerMask attackHitMask = ~0;      // layer mask for raycast (default: everything)
+    [Header("Attack / Combo")]
+    public int maxCombo = 4;
+    public float comboWindowStart = 0.75f;
+    public float comboWindowEnd = 1.25f;
+    public float transitionDuration = 0.08f;
+    public float attackRayDistance = 15f;
+    public LayerMask attackHitMask = ~0;
 
-    private bool isAttacking = false;         // overall attacking state (blocks movement)
-    private bool queuedCombo = false;         // player requested next attack (pressed Fire1 while attacking)
-    private int comboIndex = 0;               // current attack index (1..maxCombo)
-    private float lastStateNormalizedTime = 0f;
+    private bool isAttacking = false;
+    private bool queuedCombo = false;
+    private int comboIndex = 0;
     private float sprintAxis = 0f;
 
-    private Animator m_Animator;
-
     [Header("Mouse Look")]
-    public Transform cameraTransform;         // assign your Main Camera here
-    public float mouseSensitivity = 2.0f;     // sensitivity for mouse rotation
-    public float verticalLookUpLimit = 50f;
-    public float verticalLookDownLimit = 50f;
+    public Transform cameraTransform;
+    public float mouseSensitivity = 3.0f;
+    public float verticalLookUpLimit = 30f;
+    public float verticalLookDownLimit = 10f;
 
-    // CharacterController related
     private CharacterController controller;
     private Vector3 moveVelocity = Vector3.zero;
     private float verticalVelocity = 0f;
-    private float cameraPitch = 0f; // for up/down look
-    float xRotation = 0f;
+    private float cameraPitch = 0f;
+    private float directionValue = 0f;
+
+    [Header("Blocking")]
+    private bool blocking = false;
+    private bool queuedBlock = false;
+
+    [Header("Hit")]
+    private bool isHit = false;
+
+    private Animator m_Animator;
 
     void Start()
     {
         m_Animator = GetComponent<Animator>();
-
         controller = GetComponent<CharacterController>();
         if (controller == null)
         {
@@ -54,7 +57,6 @@ public class ThreeD_Character : MonoBehaviour
             controller.center = new Vector3(0f, 1.0f, 0f);
         }
 
-        // Lock/hide cursor for play (change behavior for menus)
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
     }
@@ -63,12 +65,12 @@ public class ThreeD_Character : MonoBehaviour
     {
         HandleMouseLook();
         HandleMovementInput();
-        HandleAttackInput_InputCheck(); // check inputs & queue/start combos
-        UpdateComboStateMachine();      // manage combo progression
+        HandleBlockInput();
+        HandleAttackInput();
+        UpdateComboStateMachine();
         UpdateAnimator();
     }
 
-    // ---------- Mouse Look ----------
     private void HandleMouseLook()
     {
         if (cameraTransform == null) return;
@@ -76,42 +78,39 @@ public class ThreeD_Character : MonoBehaviour
         float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity;
         float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity;
 
-        // Rotate player left/right (Y-axis)
         transform.Rotate(Vector3.up * mouseX);
 
-        // Rotate camera up/down (X-axis)
         cameraPitch -= mouseY;
         cameraPitch = Mathf.Clamp(cameraPitch, -verticalLookDownLimit, verticalLookUpLimit);
         cameraTransform.localRotation = Quaternion.Euler(cameraPitch, 0f, 0f);
     }
 
-    // ---------- Movement (WASD + Sprint + Jump) ----------
     private void HandleMovementInput()
     {
-        float inputZ = Input.GetAxis("Vertical");
-        float inputX = Input.GetAxis("Horizontal");
-        sprintAxis = Input.GetAxis("Sprint"); 
+        if (isHit) return; 
+
+        float inputZ = Input.GetAxisRaw("Vertical");
+        float inputX = Input.GetAxisRaw("Horizontal");
+        sprintAxis = Input.GetAxis("Sprint");
 
         float currentSpeed = Speed * (1f + (sprintAxis * (sprintMultiplier - 1f)));
 
-        // If attacking, disable movement entirely (matching previous behaviour)
-        if (isAttacking)
+        if (isAttacking || blocking)
         {
             inputX = 0f;
             inputZ = 0f;
         }
 
-        Vector3 localMove = transform.forward * inputZ + transform.right * inputX;
-        localMove = localMove.normalized * currentSpeed;
+        Vector3 moveDir = transform.forward * inputZ + transform.right * inputX;
+        moveDir = moveDir.normalized;
+
+        Vector3 localMove = moveDir * currentSpeed;
 
         if (controller.isGrounded)
         {
             if (verticalVelocity < 0f) verticalVelocity = -1f;
-
-            if (Input.GetButtonDown("Jump") && !isAttacking)
-            {
+            if (Input.GetButtonDown("Jump") && !isAttacking && !blocking)
                 verticalVelocity = Mathf.Sqrt(2f * gravity * Mathf.Max(0.1f, jumpHeight));
-            }
         }
         else
         {
@@ -120,52 +119,71 @@ public class ThreeD_Character : MonoBehaviour
 
         moveVelocity = localMove + Vector3.up * verticalVelocity;
         controller.Move(moveVelocity * Time.deltaTime);
+
+        directionValue = inputX;
     }
 
-    // ---------- Input: Attack press handling ----------
-    private void HandleAttackInput_InputCheck()
+    private void HandleAttackInput()
     {
-        // Player pressed attack
+        if (blocking || isHit) return; 
         if (Input.GetButtonDown("Fire1"))
         {
-            OnAttackPressed();
+            if (!isAttacking)
+            {
+                comboIndex = 1;
+                queuedCombo = false;
+                StartAttack(comboIndex);
+                isAttacking = true;
+            }
+            else
+            {
+                queuedCombo = true;
+            }
         }
     }
 
-    // Called when the player presses Fire1
-    private void OnAttackPressed()
+    private void HandleBlockInput()
     {
-        if (!isAttacking)
+        if (isHit) return; 
+        bool blockPressed = Input.GetButton("Block");
+
+        if (blockPressed)
         {
-            // Start first attack
-            comboIndex = 1;
-            queuedCombo = false;
-            StartAttack(comboIndex);
-            isAttacking = true;
+            if (isAttacking)
+            {
+                queuedBlock = true; 
+            }
+            else if (!blocking)
+            {
+                blocking = true;
+                isAttacking = false; 
+            }
         }
         else
         {
-            // Already attacking -> queue the next attack request
-            queuedCombo = true;
+            blocking = false;
+            queuedBlock = false;
         }
+
+        m_Animator.SetBool("Block", blocking);
     }
 
-    // ---------- Combo state machine (called every frame) ----------
     private void UpdateComboStateMachine()
     {
-        if (!isAttacking) return;
+        if (!isAttacking)
+        {
+            if (queuedBlock && !isHit)
+            {
+                blocking = true;
+                queuedBlock = false;
+                m_Animator.SetBool("Block", true);
+            }
+            return;
+        }
 
-        // Get animator state info (layer 0)
         AnimatorStateInfo state = m_Animator.GetCurrentAnimatorStateInfo(0);
-
-        // Safety: only run logic if in an Attack state (named AttackX)
-        string expectedStateName = "Attack" + comboIndex;
-        bool inExpectedAttackState = state.IsName(expectedStateName);
-
-        // normalized time within current clip (0..1)
         float normalizedTime = state.normalizedTime % 1f;
 
-        // If player queued a combo and we're inside the valid combo window -> advance
         if (queuedCombo && normalizedTime >= comboWindowStart && normalizedTime <= comboWindowEnd)
         {
             if (comboIndex < maxCombo)
@@ -177,45 +195,28 @@ public class ThreeD_Character : MonoBehaviour
             }
         }
 
-        // If the animation has finished (normalized >= 1) or passed the comboWindowEnd without a queued input,
-        // then we should either end the combo or ignore queued input if it's too late.
-        // We treat normalizedTime >= 1f as clip end (note: for non-looping clips normalizedTime will reach >=1).
         if (normalizedTime >= 1f || normalizedTime > comboWindowEnd)
         {
-            // If there is a queuedCombo but we missed the window, drop it
             if (queuedCombo && !(normalizedTime >= comboWindowStart && normalizedTime <= comboWindowEnd))
-            {
                 queuedCombo = false;
-            }
 
-            // If we're at the last attack or nothing queued, end combo
             if (!queuedCombo || comboIndex >= maxCombo)
-            {
                 EndCombo();
-            }
         }
-
-        lastStateNormalizedTime = normalizedTime;
     }
 
-    // Start a specific attack index (plays animation and does immediate raycast hit)
     private void StartAttack(int index)
     {
         if (index < 1 || index > maxCombo) return;
 
-        string stateName = "Attack" + index; // must match animator state name exactly
+        string stateName = "Attack" + index;
         m_Animator.CrossFade(stateName, transitionDuration, 0);
 
-        // optional: perform raycast immediately to detect hit for this attack
-        // (you can replace this with an animation event for more precise timing)
         DoAttackRaycast();
-
-        // ensure flags
         isAttacking = true;
         queuedCombo = false;
     }
 
-    // Raycast logic for hitting something in front of the player
     private void DoAttackRaycast()
     {
         Vector3 origin = transform.position + Vector3.up * 1f;
@@ -224,30 +225,21 @@ public class ThreeD_Character : MonoBehaviour
         if (Physics.Raycast(origin, dir, out RaycastHit hit, attackRayDistance, attackHitMask))
         {
             GameObject root = hit.collider.transform.root.gameObject;
-            Debug.Log("[Attack] Ray hit: " + root.name);
-
             if (hit.collider.gameObject != this.gameObject)
-            {
-                // Default behaviour: destroy the hit object (change as needed)
                 Destroy(hit.collider.gameObject);
-            }
         }
 
         Debug.DrawRay(origin, dir * attackRayDistance, Color.yellow, 0.5f);
     }
 
-    // End combo & reset state
     private void EndCombo()
     {
         isAttacking = false;
         queuedCombo = false;
         comboIndex = 0;
-        // Make sure animator knows we're not attacking (if you rely on a boolean)
         m_Animator.SetBool("Attack", false);
     }
 
-    // Optional hook: call from animation event at exact combo window
-    // If you add an animation event named OnComboWindowOpen, you can chain precisely there:
     public void OnComboWindowOpen()
     {
         if (queuedCombo && comboIndex < maxCombo)
@@ -258,16 +250,45 @@ public class ThreeD_Character : MonoBehaviour
         }
     }
 
-    // ---------- Animator updates ----------
     private void UpdateAnimator()
     {
         Vector3 planarVelocity = new Vector3(controller.velocity.x, 0f, controller.velocity.z);
-        float speedValue = planarVelocity.magnitude;
 
-        m_Animator.SetFloat("Speed", speedValue);
+        float forward = Vector3.Dot(planarVelocity, transform.forward);
+        float right = Vector3.Dot(planarVelocity, transform.right);
+
+        float targetSpeed = Mathf.Abs(forward) > 0.01f ? forward : 0f;
+        float targetDirection = Mathf.Abs(right) > 0.01f ? right / Speed : 0f;
+
+        float smoothTime = 0.1f;
+        m_Animator.SetFloat("Speed", targetSpeed, smoothTime, Time.deltaTime);
+        m_Animator.SetFloat("Direction", targetDirection, smoothTime, Time.deltaTime);
         m_Animator.SetBool("Attack", isAttacking);
         m_Animator.SetBool("Grounded", controller.isGrounded);
-        m_Animator.SetFloat("VerticalVelocity", verticalVelocity);
         m_Animator.SetFloat("Sprint", sprintAxis);
+        m_Animator.SetBool("Block", blocking);
+        m_Animator.SetBool("Hit", isHit);
+    }
+
+    public void GetHit()
+    {
+        if (isHit) return; 
+        StartCoroutine(HitRoutine());
+    }
+
+    private IEnumerator HitRoutine()
+    {
+        isHit = true;
+
+        isAttacking = false;
+        queuedCombo = false;
+
+        m_Animator.SetBool("Attack", false);
+        m_Animator.SetBool("Hit", true);
+
+        yield return new WaitForSeconds(0.25f);
+
+        isHit = false;
+        m_Animator.SetBool("Hit", false);
     }
 }
