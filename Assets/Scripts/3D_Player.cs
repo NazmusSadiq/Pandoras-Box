@@ -7,15 +7,15 @@ public class ThreeD_Character : MonoBehaviour
 {
     [Header("Movement")]
     public float Speed = 2.0f;
-    public float sprintMultiplier = 3.0f;
+    float sprintMultiplier = 3.0f;
     public float jumpHeight = 1.5f;
-    public float gravity = 9.81f;
+    float gravity = 9.81f;
 
     [Header("Attack / Combo")]
     public int maxCombo = 4;
-    public float comboWindowStart = 0.75f;
-    public float comboWindowEnd = 1.25f;
-    public float transitionDuration = 0.08f;
+    float comboWindowStart = 0.85f;
+    float comboWindowEnd = 0.99f;
+    float transitionDuration = 0.08f;
     public float attackRayDistance = 15f;
     public LayerMask attackHitMask = ~0;
 
@@ -24,17 +24,16 @@ public class ThreeD_Character : MonoBehaviour
     private int comboIndex = 0;
     private float sprintAxis = 0f;
 
-    [Header("Mouse Look")]
+    [Header("Camera / Orbit")]
     public Transform cameraTransform;
+    Vector3 cameraOffset = new Vector3(-0.5f, 1.5f, 0.5f);
     public float mouseSensitivity = 3.0f;
-    public float verticalLookUpLimit = 30f;
-    public float verticalLookDownLimit = 10f;
+    float verticalLookUpLimit = 30f;
+    float verticalLookDownLimit = 10f;
 
-    private CharacterController controller;
-    private Vector3 moveVelocity = Vector3.zero;
-    private float verticalVelocity = 0f;
-    private float cameraPitch = 0f;
-    private float directionValue = 0f;
+    private Vector3 initialCameraOffset;
+    private float cameraPitch;
+    private float cameraYaw;
 
     [Header("Blocking")]
     private bool blocking = false;
@@ -44,7 +43,16 @@ public class ThreeD_Character : MonoBehaviour
     private bool isHit = false;
 
     private Animator m_Animator;
+    private CharacterController controller;
+    private Vector3 moveVelocity = Vector3.zero;
+    private float verticalVelocity = 0f;
+    private float directionValue = 0f;
 
+    private void Awake()
+    {
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+    }
     void Start()
     {
         m_Animator = GetComponent<Animator>();
@@ -57,8 +65,14 @@ public class ThreeD_Character : MonoBehaviour
             controller.center = new Vector3(0f, 1.0f, 0f);
         }
 
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
+        if (cameraTransform != null)
+        {
+            initialCameraOffset = cameraTransform.position - transform.position;
+
+            Vector3 angles = cameraTransform.eulerAngles;
+            cameraYaw = angles.y;
+            cameraPitch = angles.x;
+        }
     }
 
     void Update()
@@ -69,6 +83,7 @@ public class ThreeD_Character : MonoBehaviour
         HandleAttackInput();
         UpdateComboStateMachine();
         UpdateAnimator();
+        UpdateCameraPosition();
     }
 
     private void HandleMouseLook()
@@ -78,16 +93,34 @@ public class ThreeD_Character : MonoBehaviour
         float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity;
         float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity;
 
-        transform.Rotate(Vector3.up * mouseX);
-
+        cameraYaw += mouseX;
         cameraPitch -= mouseY;
         cameraPitch = Mathf.Clamp(cameraPitch, -verticalLookDownLimit, verticalLookUpLimit);
-        cameraTransform.localRotation = Quaternion.Euler(cameraPitch, 0f, 0f);
     }
+
+    private void UpdateCameraPosition()
+    {
+        if (cameraTransform == null) return;
+
+        float distance = initialCameraOffset.magnitude;
+
+        Quaternion rotation = Quaternion.Euler(cameraPitch, cameraYaw, 0f);
+
+        Vector3 baseOffset = new Vector3(0f, cameraOffset.y, -distance);
+
+        Vector3 sidewaysOffset = new Vector3(cameraOffset.x, 0f, 0f);
+
+        Vector3 finalOffset = rotation * (baseOffset + sidewaysOffset);
+
+        cameraTransform.position = transform.position + finalOffset;
+
+        cameraTransform.LookAt(transform.position + new Vector3(0f, cameraOffset.y, 0f));
+    }
+
 
     private void HandleMovementInput()
     {
-        if (isHit) return; 
+        if (isHit) return;
 
         float inputZ = Input.GetAxisRaw("Vertical");
         float inputX = Input.GetAxisRaw("Horizontal");
@@ -101,7 +134,10 @@ public class ThreeD_Character : MonoBehaviour
             inputZ = 0f;
         }
 
-        Vector3 moveDir = transform.forward * inputZ + transform.right * inputX;
+        Vector3 cameraForward = Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up).normalized;
+        Vector3 cameraRight = Vector3.ProjectOnPlane(cameraTransform.right, Vector3.up).normalized;
+
+        Vector3 moveDir = cameraForward * inputZ + cameraRight * inputX;
         moveDir = moveDir.normalized;
 
         Vector3 localMove = moveDir * currentSpeed;
@@ -120,12 +156,17 @@ public class ThreeD_Character : MonoBehaviour
         moveVelocity = localMove + Vector3.up * verticalVelocity;
         controller.Move(moveVelocity * Time.deltaTime);
 
+        if (moveDir.magnitude > 0.1f)
+        {
+            transform.forward = Vector3.Slerp(transform.forward, moveDir, Time.deltaTime * 10f);
+        }
+
         directionValue = inputX;
     }
 
     private void HandleAttackInput()
     {
-        if (blocking || isHit) return; 
+        if (blocking || isHit || !controller.isGrounded) return;
         if (Input.GetButtonDown("Fire1"))
         {
             if (!isAttacking)
@@ -144,19 +185,19 @@ public class ThreeD_Character : MonoBehaviour
 
     private void HandleBlockInput()
     {
-        if (isHit) return; 
+        if (isHit || !controller.isGrounded) return;
         bool blockPressed = Input.GetButton("Block");
 
         if (blockPressed)
         {
             if (isAttacking)
             {
-                queuedBlock = true; 
+                queuedBlock = true;
             }
             else if (!blocking)
             {
                 blocking = true;
-                isAttacking = false; 
+                isAttacking = false;
             }
         }
         else
@@ -272,7 +313,7 @@ public class ThreeD_Character : MonoBehaviour
 
     public void GetHit()
     {
-        if (isHit) return; 
+        if (isHit) return;
         StartCoroutine(HitRoutine());
     }
 
