@@ -1,6 +1,5 @@
 # ========== Git LFS for Unity Large Assets ==========
 # Track all content in Assets/ (except text-based files) via LFS
-
 # Images
 Assets/**/*.{png,jpg,jpeg,tga,tif,tiff,exr,psd} filter=lfs diff=lfs merge=lfs -text
 # Audio
@@ -16,4 +15,5 @@ Assets/**/*.{cs,shader,compute,txt,json,xml,asmdef,mat,anim,controller,mask} -te
 # Project settings and other text files
 ProjectSettings/** -text
 Packages/** -text
+Assets/Scenes/3D_GameScene_1/*.asset filter=lfs diff=lfs merge=lfs -text
 Assets/Scenes/**/*.asset filter=lfs diff=lfs merge=lfs -text
