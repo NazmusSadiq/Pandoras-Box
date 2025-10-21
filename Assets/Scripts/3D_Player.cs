@@ -42,6 +42,10 @@ public class ThreeD_Character : MonoBehaviour
     [Header("Hit")]
     private bool isHit = false;
 
+    [Header("Health")]
+    public float Health = 100f;
+    private bool dead = false;
+
     private Animator m_Animator;
     private CharacterController controller;
     private Vector3 moveVelocity = Vector3.zero;
@@ -53,6 +57,7 @@ public class ThreeD_Character : MonoBehaviour
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
     }
+
     void Start()
     {
         m_Animator = GetComponent<Animator>();
@@ -77,6 +82,9 @@ public class ThreeD_Character : MonoBehaviour
 
     void Update()
     {
+        // Don't process any input if dead
+        //if (dead) return;
+
         HandleMouseLook();
         HandleMovementInput();
         HandleBlockInput();
@@ -88,7 +96,7 @@ public class ThreeD_Character : MonoBehaviour
 
     private void HandleMouseLook()
     {
-        if (cameraTransform == null) return;
+        if (cameraTransform == null || dead) return;
 
         float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity;
         float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity;
@@ -100,7 +108,7 @@ public class ThreeD_Character : MonoBehaviour
 
     private void UpdateCameraPosition()
     {
-        if (cameraTransform == null) return;
+        if (cameraTransform == null || dead) return;
 
         float distance = initialCameraOffset.magnitude;
 
@@ -117,18 +125,15 @@ public class ThreeD_Character : MonoBehaviour
         cameraTransform.LookAt(transform.position + new Vector3(0f, cameraOffset.y, 0f));
     }
 
-
     private void HandleMovementInput()
     {
-        if (isHit) return;
-
         float inputZ = Input.GetAxisRaw("Vertical");
         float inputX = Input.GetAxisRaw("Horizontal");
         sprintAxis = Input.GetAxis("Sprint");
 
         float currentSpeed = Speed * (1f + (sprintAxis * (sprintMultiplier - 1f)));
 
-        if (isAttacking || blocking)
+        if (isAttacking || blocking || isHit || dead)
         {
             inputX = 0f;
             inputZ = 0f;
@@ -145,7 +150,7 @@ public class ThreeD_Character : MonoBehaviour
         if (controller.isGrounded)
         {
             if (verticalVelocity < 0f) verticalVelocity = -1f;
-            if (Input.GetButtonDown("Jump") && !isAttacking && !blocking)
+            if (Input.GetButtonDown("Jump") && !isAttacking && !blocking && !dead)
                 verticalVelocity = Mathf.Sqrt(2f * gravity * Mathf.Max(0.1f, jumpHeight));
         }
         else
@@ -166,7 +171,7 @@ public class ThreeD_Character : MonoBehaviour
 
     private void HandleAttackInput()
     {
-        if (blocking || isHit || !controller.isGrounded) return;
+        if (blocking || isHit || !controller.isGrounded || dead) return;
         if (Input.GetButtonDown("Fire1"))
         {
             if (!isAttacking)
@@ -185,7 +190,7 @@ public class ThreeD_Character : MonoBehaviour
 
     private void HandleBlockInput()
     {
-        if (isHit || !controller.isGrounded) return;
+        if (isHit || !controller.isGrounded || dead) return;
         bool blockPressed = Input.GetButton("Block");
 
         if (blockPressed)
@@ -211,6 +216,8 @@ public class ThreeD_Character : MonoBehaviour
 
     private void UpdateComboStateMachine()
     {
+        if (dead) return;
+
         if (!isAttacking)
         {
             if (queuedBlock && !isHit)
@@ -248,7 +255,7 @@ public class ThreeD_Character : MonoBehaviour
 
     private void StartAttack(int index)
     {
-        if (index < 1 || index > maxCombo) return;
+        if (index < 1 || index > maxCombo || dead) return;
 
         string stateName = "Attack" + index;
         m_Animator.CrossFade(stateName, transitionDuration, 0);
@@ -258,19 +265,68 @@ public class ThreeD_Character : MonoBehaviour
         queuedCombo = false;
     }
 
+    // Add this to the player's DoAttackRaycast method in 3D_Player.cs
     private void DoAttackRaycast()
     {
+        if (dead) return;
+
         Vector3 origin = transform.position + Vector3.up * 1f;
         Vector3 dir = transform.forward;
 
         if (Physics.Raycast(origin, dir, out RaycastHit hit, attackRayDistance, attackHitMask))
         {
-            GameObject root = hit.collider.transform.root.gameObject;
-            if (hit.collider.gameObject != this.gameObject)
+            // Check if we hit an enemy
+            ThreeD_Patrolling_Enemy enemy = hit.collider.transform.root.GetComponent<ThreeD_Patrolling_Enemy>();
+            if (enemy != null && !enemy.IsDead())
+            {
+                if (!enemy.IsBlocking())
+                {
+                    enemy.GetHit(10);
+                }
+                else
+                {
+                    enemy.PlayBlockingSound();
+                }
+                MakeEnemyFacePlayer(enemy);                 
+            }
+            // You can keep the destruction for other objects if desired
+            else if (hit.collider.gameObject != this.gameObject)
+            {
                 Destroy(hit.collider.gameObject);
+            }
         }
 
         Debug.DrawRay(origin, dir * attackRayDistance, Color.yellow, 0.5f);
+    }
+
+    private void MakeEnemyFacePlayer(ThreeD_Patrolling_Enemy enemy)
+    {
+        if (enemy == null) return;
+        StartCoroutine(RotateEnemyToFacePlayer(enemy));
+    }
+
+    private IEnumerator RotateEnemyToFacePlayer(ThreeD_Patrolling_Enemy enemy)
+    {
+        if (enemy == null) yield break;
+
+        Transform enemyTransform = enemy.transform;
+
+        Vector3 directionToPlayer = (transform.position - enemyTransform.position).normalized;
+        directionToPlayer.y = 0f; 
+
+        if (directionToPlayer.sqrMagnitude <= 0.0001f) yield break;
+
+        Quaternion targetRotation = Quaternion.LookRotation(directionToPlayer);
+        float rotationProgress = 0f;
+
+        while (rotationProgress < 1f)
+        {
+            rotationProgress += Time.deltaTime * 5; 
+            enemyTransform.rotation = Quaternion.Slerp(enemyTransform.rotation, targetRotation, rotationProgress);
+            yield return null;
+        }
+
+        enemyTransform.rotation = targetRotation;
     }
 
     private void EndCombo()
@@ -283,6 +339,8 @@ public class ThreeD_Character : MonoBehaviour
 
     public void OnComboWindowOpen()
     {
+        if (dead) return;
+
         if (queuedCombo && comboIndex < maxCombo)
         {
             comboIndex++;
@@ -309,12 +367,39 @@ public class ThreeD_Character : MonoBehaviour
         m_Animator.SetFloat("Sprint", sprintAxis);
         m_Animator.SetBool("Block", blocking);
         m_Animator.SetBool("Hit", isHit);
+        m_Animator.SetBool("Dead", dead); 
     }
 
-    public void GetHit()
+    public void GetHit(float amount)
     {
-        if (isHit) return;
+        if (isHit || dead) return;
+        Health -= amount;
+
+        if (Health <= 0)
+        {
+            Health = 0;
+            HandleDeath();
+            return;
+        }
+
         StartCoroutine(HitRoutine());
+    }
+
+    private void HandleDeath()
+    {
+        dead = true;
+
+        isAttacking = false;
+        queuedCombo = false;
+        blocking = false;
+        isHit = false;
+
+        m_Animator.SetBool("Attack", false);
+        m_Animator.SetBool("Block", false);
+        m_Animator.SetBool("Hit", false);
+        m_Animator.SetBool("Dead", true);
+
+
     }
 
     private IEnumerator HitRoutine()
@@ -332,4 +417,15 @@ public class ThreeD_Character : MonoBehaviour
         isHit = false;
         m_Animator.SetBool("Hit", false);
     }
+
+    public bool IsBlocking()
+    {
+        return blocking && !dead;
+    }
+
+    public bool IsDead()
+    {
+        return dead;
+    }
+
 }
