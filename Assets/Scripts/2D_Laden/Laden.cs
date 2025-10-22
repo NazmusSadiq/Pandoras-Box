@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.Collections;
+using UnityEngine;
 
 public class Laden : MonoBehaviour
 {
@@ -12,7 +13,7 @@ public class Laden : MonoBehaviour
     public GameObject planePrefab;
     public Laden_GameManager gameManager = null;
     public float planeSpeed = 10f;
-    public AudioSource astagfirullah = null;
+    public AudioSource hitSound = null;
     private Animator m_Animator;
     private Rigidbody2D rb;
     private float speed;
@@ -77,7 +78,7 @@ public class Laden : MonoBehaviour
     }
 
     public bool canMove() => !shooting && !crawling && !dead;
-    public bool canShoot() => !(jumping || shooting || crawling || dead);
+    public bool canShoot() => !(jumping || shooting || crawling || dead) && onFloor;
     public bool canJumpOrCrawl() => onFloor && !shooting && !dead;
 
     public void Jump()
@@ -94,14 +95,20 @@ public class Laden : MonoBehaviour
 
     public void Shoot()
     {
+        if (shooting || dead) return;
+
         shooting = true;
+        StartCoroutine(ShootWithDelay(0.25f));
+    }
+
+    private IEnumerator ShootWithDelay(float delay)
+    {
+        yield return new WaitForSeconds(delay);
 
         if (planePrefab != null)
         {
-            // Spawn plane at the player's position
             GameObject newPlane = Instantiate(planePrefab, transform.position, Quaternion.identity);
 
-            // Set direction based on player facing
             int dir = transform.localScale.x > 0 ? 1 : -1;
 
             Plane planeScript = newPlane.GetComponent<Plane>();
@@ -110,9 +117,10 @@ public class Laden : MonoBehaviour
                 planeScript.SetDirection(dir);
                 planeScript.speed = planeSpeed;
             }
-            Invoke(nameof(StopShooting), 0.5f);
         }
+        Invoke(nameof(StopShooting), 0.75f);
     }
+
 
     private void StopShooting()
     {
@@ -184,9 +192,9 @@ public class Laden : MonoBehaviour
     {
         if (other.CompareTag("Bullet"))
         {
-            if (astagfirullah != null)
+            if (hitSound != null)
             {
-                astagfirullah.Play();
+                hitSound.Play();
             }
             gameManager.Reduce_Lives();
             Destroy(other.gameObject);

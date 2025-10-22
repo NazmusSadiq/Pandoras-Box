@@ -12,15 +12,6 @@ public class UI_Handler : MonoBehaviour
         Time.timeScale = 1f;
     }
 
-    public void Retry()
-    {
-
-        UnityEngine.SceneManagement.Scene currentScene = SceneManager.GetActiveScene();
-
-        SceneManager.LoadScene(currentScene.name);
-        Time.timeScale = 1f;
-    }
-
     public void Go_To_Main_Menu()
     {
         SceneManager.LoadScene(menu_scene);

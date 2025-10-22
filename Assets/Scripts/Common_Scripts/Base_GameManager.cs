@@ -9,10 +9,10 @@ public abstract class Base_GameManager : MonoBehaviour
 
     private void Update()
     {
-        if(Input.GetKeyDown(KeyCode.R))
-        {
-            Game_Over();
-        }
+        //if(Input.GetKeyDown(KeyCode.R))
+        //{
+        //    Game_Over();
+        //}
     }
     public void Game_Over()
     {
@@ -31,11 +31,6 @@ public abstract class Base_GameManager : MonoBehaviour
         }
         gameOver = true;
     }
-
-    /// <summary>
-    /// Finish the subscene: mark the originating SubSceneTrigger as completed,
-    /// then perform the normal game-over/exit behavior.
-    /// </summary>
     public void Finish_Game()
     {
         // 1) Find the SubSceneTrigger in other loaded scenes that corresponds to this subscene

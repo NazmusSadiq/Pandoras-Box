@@ -34,6 +34,13 @@ public class SubSceneTrigger : MonoBehaviour
         }
     }
 
+    private void Update()
+    {
+        if (hasCompleted)
+        {
+            Destroy(transform.root.gameObject);
+        }
+    }
     private void OnTriggerEnter(Collider other)
     {
         // Optional tag check
@@ -55,14 +62,8 @@ public class SubSceneTrigger : MonoBehaviour
         SceneTransitionController.Instance.EnterSubScene(subSceneName);
     }
 
-    /// <summary>
-    /// Put any custom condition checking here.
-    /// Replace/extend as required.
-    /// </summary>
     private bool CanProceedFromHere(Collider who)
     {
-        // Example: allow only if player has X item, or if some game manager flag, etc.
-        // For now: always allow.
         return !hasCompleted;
     }
 }
