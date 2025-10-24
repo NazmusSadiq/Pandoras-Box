@@ -82,9 +82,6 @@ public class ThreeD_Character : MonoBehaviour
 
     void Update()
     {
-        // Don't process any input if dead
-        //if (dead) return;
-
         HandleMouseLook();
         HandleMovementInput();
         HandleBlockInput();
@@ -187,6 +184,30 @@ public class ThreeD_Character : MonoBehaviour
             }
         }
     }
+    void ApplyBlockingPushback()
+    {
+        Vector3 pushbackDirection = -transform.forward;
+        float pushbackDistance = 0.25f;
+        float pushbackDuration = 0.15f;
+
+        StartCoroutine(SmoothPushback(pushbackDirection, pushbackDistance, pushbackDuration));
+    }
+
+    private IEnumerator SmoothPushback(Vector3 direction, float distance, float duration)
+    {
+        Vector3 startPosition = transform.position;
+        Vector3 targetPosition = startPosition + (direction * distance);
+        float elapsedTime = 0f;
+
+        while (elapsedTime < duration)
+        {
+            transform.position = Vector3.Lerp(startPosition, targetPosition, elapsedTime / duration);
+            elapsedTime += Time.deltaTime;
+            yield return null;
+        }
+
+        transform.position = targetPosition;
+    }
 
     private void HandleBlockInput()
     {
@@ -203,6 +224,7 @@ public class ThreeD_Character : MonoBehaviour
             {
                 blocking = true;
                 isAttacking = false;
+                ApplyBlockingPushback();
             }
         }
         else
@@ -265,7 +287,6 @@ public class ThreeD_Character : MonoBehaviour
         queuedCombo = false;
     }
 
-    // Add this to the player's DoAttackRaycast method in 3D_Player.cs
     private void DoAttackRaycast()
     {
         if (dead) return;
@@ -275,8 +296,12 @@ public class ThreeD_Character : MonoBehaviour
 
         if (Physics.Raycast(origin, dir, out RaycastHit hit, attackRayDistance, attackHitMask))
         {
-            // Check if we hit an enemy
-            ThreeD_Patrolling_Enemy enemy = hit.collider.transform.root.GetComponent<ThreeD_Patrolling_Enemy>();
+            Debug.Log(hit.collider);
+            ThreeD_Enemy enemy = hit.collider.transform.root.GetComponent<ThreeD_Enemy>();
+            if(enemy == null)
+            {
+                enemy = hit.collider.transform.root.root.GetComponent<ThreeD_Enemy>();
+            }
             if (enemy != null && !enemy.IsDead())
             {
                 if (!enemy.IsBlocking())
@@ -289,7 +314,6 @@ public class ThreeD_Character : MonoBehaviour
                 }
                 MakeEnemyFacePlayer(enemy);                 
             }
-            // You can keep the destruction for other objects if desired
             else if (hit.collider.gameObject != this.gameObject)
             {
                 Destroy(hit.collider.gameObject);
@@ -299,13 +323,13 @@ public class ThreeD_Character : MonoBehaviour
         Debug.DrawRay(origin, dir * attackRayDistance, Color.yellow, 0.5f);
     }
 
-    private void MakeEnemyFacePlayer(ThreeD_Patrolling_Enemy enemy)
+    private void MakeEnemyFacePlayer(ThreeD_Enemy enemy)
     {
         if (enemy == null) return;
         StartCoroutine(RotateEnemyToFacePlayer(enemy));
     }
 
-    private IEnumerator RotateEnemyToFacePlayer(ThreeD_Patrolling_Enemy enemy)
+    private IEnumerator RotateEnemyToFacePlayer(ThreeD_Enemy enemy)
     {
         if (enemy == null) yield break;
 
