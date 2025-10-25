@@ -302,11 +302,13 @@ public class TwoD_Player : MonoBehaviour
         string layerName = LayerMask.LayerToName(other.gameObject.layer);
         Debug.Log($"[Attack Hit] Entered object layer: {layerName}", other.gameObject);
 
-        var goblin = other.GetComponent<TwoD_Goblin>() ?? other.GetComponentInParent<TwoD_Goblin>();
-        if (goblin != null)
+        if (other.gameObject.layer == 8)
         {
-            goblin.Hit();
-            return;
+            var enemy = other.GetComponentInParent<TwoD_Enemy>();
+            if (enemy != null)
+            {
+                enemy.Hit();
+            }
         }
     }
 

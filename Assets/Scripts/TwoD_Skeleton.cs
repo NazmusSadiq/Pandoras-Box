@@ -2,7 +2,7 @@ using UnityEngine;
 using System.Collections;
 
 [RequireComponent(typeof(Rigidbody2D))]
-public class TwoD_Goblin : TwoD_Enemy
+public class TwoD_Skeleton : TwoD_Enemy
 {
     [Header("References")]
     [SerializeField] private Animator animator;
@@ -261,7 +261,6 @@ public class TwoD_Goblin : TwoD_Enemy
     public override void Hit()
     {
         if (isDead) return;
-        collider2D.enabled = false;
 
         // If lethal now or after decrement, die immediately
         if (health <= 0)
@@ -311,6 +310,7 @@ public class TwoD_Goblin : TwoD_Enemy
     void Die()
     {
         isDead = true;
+        
 
         // stop everything
         stunned = true;
@@ -326,12 +326,12 @@ public class TwoD_Goblin : TwoD_Enemy
         animator.ResetTrigger("Attack");
         animator.ResetTrigger("Hit");
 
-        animator.Play("Goblin_Death", 0, 0f);
-
-        collider2D.enabled = false; 
+        animator.Play("Skeleton_Death", 0, 0f);
 
         // Optional: disable further AI
+        collider2D.enabled = false;
         enabled = false;
+        
     }
 
     // ---------- Helpers ----------
