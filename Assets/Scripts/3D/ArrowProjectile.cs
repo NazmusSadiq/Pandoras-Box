@@ -4,6 +4,7 @@ public class ArrowProjectile : MonoBehaviour
 {
     public float damage = 10f;
     public float lifetime = 5f;
+    private ThreeD_Enemy ownerArcher;
 
     private Rigidbody rb;
     private bool isReleased = false;
@@ -13,8 +14,9 @@ public class ArrowProjectile : MonoBehaviour
     public AudioClip fleshSound;
     public BoxCollider boxCollider = null;
 
-    public void Release()
+    public void Release(ThreeD_Enemy archerRef)
     {
+        ownerArcher = archerRef;
         isReleased = true;
         if(boxCollider != null )
         {
@@ -30,14 +32,18 @@ public class ArrowProjectile : MonoBehaviour
         if (collision.collider.CompareTag("Player"))
         {
             ThreeD_Character player = collision.collider.GetComponentInParent<ThreeD_Character>();
-            if (player != null && !player.IsBlocking())
+            if (player != null)
             {
-                player.GetHit(damage);
-                AudioSource.PlayClipAtPoint(fleshSound, transform.position);
-            }
-            else
-            {
-                AudioSource.PlayClipAtPoint(stuckSound, transform.position);
+                if (!player.IsBlocking())
+                {
+                    player.GetHit(damage);
+                    AudioSource.PlayClipAtPoint(fleshSound, transform.position);
+                }
+                if (ownerArcher != null)
+                {
+                    ownerArcher.MakePlayerFaceEnemy();
+                    AudioSource.PlayClipAtPoint(stuckSound, transform.position);
+                }
             }
             Destroy(gameObject);
             return;

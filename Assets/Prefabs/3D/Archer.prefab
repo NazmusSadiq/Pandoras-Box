@@ -3267,10 +3267,10 @@ MonoBehaviour:
   stuckVelocityThreshold: 0.05
   arrowProjectileSpeed: 25
   archerAttackRange: 15
-  timeBetweenShots: 5
+  timeBetweenShots: 3
   arrowProjectilePrefab: {fileID: 3656614511532303199, guid: dfc25bb48866cc54080cdbc2d475ad6f, type: 3}
   arrowSpawnPoint: {fileID: 5244007311025808640}
-  arrowDeviationAngle: 5
+  arrowDeviationAngle: 4
 --- !u!1 &8693403155089465534
 GameObject:
   m_ObjectHideFlags: 0

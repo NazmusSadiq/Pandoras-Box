@@ -102,8 +102,6 @@ public class ThreeD_Archer : ThreeD_Enemy
             Transform found = transform.Find("ArrowSpawnPoint");
             if (found != null)
                 arrowSpawnPoint = found;
-            else
-                Debug.LogWarning("[Archer] ArrowSpawnPoint not found under Archer!");
         }
     }
 
@@ -119,13 +117,11 @@ public class ThreeD_Archer : ThreeD_Enemy
         {
             if (!isAttacking && (isChasing || inAttackRange))
             {
-                Debug.Log("[Archer] Player is dead, stopping all combat and returning to patrol");
                 StopAllCombat();
                 ResumePatrol();
             }
             else if (isAttacking && !playerDeadDuringAttack)
             {
-                Debug.Log("[Archer] Player died during attack, will finish current attack then stop");
                 playerDeadDuringAttack = true;
             }
 
@@ -206,7 +202,6 @@ public class ThreeD_Archer : ThreeD_Enemy
 
         if (IsPlayerDead())
         {
-            Debug.Log("[Archer] Player died during attack delay, cancelling shot");
             EndShooting();
             yield break;
         }
@@ -219,16 +214,14 @@ public class ThreeD_Archer : ThreeD_Enemy
 
     private void FireArrow()
     {
-        if (arrowProjectilePrefab == null)
+        if (arrowProjectilePrefab == null || isHit)
         {
-            Debug.LogWarning("[Archer] Arrow projectile prefab not set!");
             EndShooting();
             return;
         }
 
         if (arrowSpawnPoint == null)
         {
-            Debug.LogWarning("[Archer] ArrowSpawnPoint not found! Assign or name it correctly under Archer.");
             EndShooting();
             return;
         }
@@ -281,7 +274,7 @@ public class ThreeD_Archer : ThreeD_Enemy
             ArrowProjectile arrowProjectile = arrow.GetComponent<ArrowProjectile>();
             if(arrowProjectile != null)
             {
-                arrowProjectile.Release();
+                arrowProjectile.Release(this);
             }
         }
     }
@@ -322,7 +315,6 @@ public class ThreeD_Archer : ThreeD_Enemy
             return;
         }
 
-        // Use archer-specific attack range
         float currentAttackRange = archerAttackRange;
 
         if (inAttackRange)
@@ -343,7 +335,6 @@ public class ThreeD_Archer : ThreeD_Enemy
         {
             if (IsPlayerDead() && !isShooting)
             {
-                Debug.Log("[Archer] Player died during chase, returning to patrol");
                 isChasing = false;
                 inAttackRange = false;
                 isAware = false;

@@ -45,6 +45,7 @@ public class ThreeD_Enemy : MonoBehaviour
     protected float sprintAxis = 0f;
     protected float attackCooldownTimer = 0f;
     protected bool playerDeadDuringAttack = false;
+    protected bool isJumpAttacking = false;
 
     [Header("Blocking")]
     protected bool blocking = false;
@@ -136,7 +137,7 @@ public class ThreeD_Enemy : MonoBehaviour
 
     #region Movement / Patrol / Chase
 
-    protected void HandleMovementBehavior()
+    virtual protected void HandleMovementBehavior()
     {
         if (dead || isHit)
         {
@@ -149,7 +150,6 @@ public class ThreeD_Enemy : MonoBehaviour
         {
             if (isChasing || inAttackRange)
             {
-                Debug.Log("[Enemy] Player is dead, stopping combat");
                 StopAllCombat();
                 ResumePatrol();
             }
@@ -174,7 +174,6 @@ public class ThreeD_Enemy : MonoBehaviour
         {
             if (IsPlayerDead() && !isAttacking)
             {
-                Debug.Log("[Enemy] Player died during chase, returning to patrol");
                 isChasing = false;
                 inAttackRange = false;
                 isAware = false; // NEW: No longer aware
@@ -337,7 +336,6 @@ public class ThreeD_Enemy : MonoBehaviour
             navAgent.SetDestination(patrolPositions[currentPatrolIndex]);
         }
 
-        Debug.Log("[Enemy] Returning to patrol");
     }
 
     #endregion
@@ -458,7 +456,6 @@ public class ThreeD_Enemy : MonoBehaviour
 
         if (IsPlayerDead())
         {
-            Debug.Log("[Enemy] Player died during attack delay, cancelling attack");
             yield break;
         }
 
@@ -474,7 +471,6 @@ public class ThreeD_Enemy : MonoBehaviour
 
         if (IsPlayerDead())
         {
-            Debug.Log("[Enemy] Cannot attack dead player");
             return;
         }
 
@@ -510,7 +506,7 @@ public class ThreeD_Enemy : MonoBehaviour
         }
     }
 
-    protected void MakePlayerFaceEnemy()
+    public void MakePlayerFaceEnemy()
     {
         if (player == null) return;
         StartCoroutine(RotatePlayerToFaceEnemy());
@@ -538,10 +534,27 @@ public class ThreeD_Enemy : MonoBehaviour
         player.rotation = targetRotation;
     }
 
-    protected void UpdateComboStateMachine()
+    virtual protected void UpdateComboStateMachine()
     {
         if (!isAttacking) return;
         if (m_Animator == null) return;
+
+        // Check if player moved out of attack range during combo
+        if (player != null && Vector3.Distance(transform.position, player.position) > attackRange)
+        {
+            EndCombo();
+            if (isChasing && !IsPlayerDead())
+            {
+                // Resume chasing if player is still alive and in chase range
+                inAttackRange = false;
+                if (navAgent != null)
+                {
+                    navAgent.isStopped = false;
+                    navAgent.SetDestination(player.position);
+                }
+            }
+            return;
+        }
 
         AnimatorStateInfo state = m_Animator.GetCurrentAnimatorStateInfo(0);
         float normalizedTime = state.normalizedTime;
@@ -555,18 +568,35 @@ public class ThreeD_Enemy : MonoBehaviour
                 return;
             }
 
-            if (comboIndex < maxCombo)
+            // Check again if player is still in range before starting next combo attack
+            if (player != null && Vector3.Distance(transform.position, player.position) <= attackRange)
             {
-                comboIndex++;
-                StartAttack(comboIndex);
+                if (comboIndex < maxCombo)
+                {
+                    comboIndex++;
+                    StartAttack(comboIndex);
+                }
+                else
+                {
+                    EndCombo();
+                }
             }
             else
             {
+                // Player moved out of range during combo transition
                 EndCombo();
+                if (isChasing && !IsPlayerDead())
+                {
+                    inAttackRange = false;
+                    if (navAgent != null)
+                    {
+                        navAgent.isStopped = false;
+                        navAgent.SetDestination(player.position);
+                    }
+                }
             }
         }
     }
-
     protected void EndCombo()
     {
         isAttacking = false;
@@ -633,13 +663,12 @@ public class ThreeD_Enemy : MonoBehaviour
         postHitAttackLockout = 2f;
     }
 
-    protected IEnumerator HitRoutine()
+    virtual protected IEnumerator HitRoutine()
     {
         isHit = true;
 
         if (!isChasing && !inAttackRange && player != null)
         {
-            Debug.Log("[Enemy] Hit by player, becoming aware!");
             isChasing = true;
             inAttackRange = false;
             isAware = true; 

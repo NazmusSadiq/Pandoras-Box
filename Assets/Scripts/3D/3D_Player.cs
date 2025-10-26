@@ -296,7 +296,6 @@ public class ThreeD_Character : MonoBehaviour
 
         if (Physics.Raycast(origin, dir, out RaycastHit hit, attackRayDistance, attackHitMask))
         {
-            Debug.Log(hit.collider);
             ThreeD_Enemy enemy = hit.collider.transform.root.GetComponent<ThreeD_Enemy>();
             if(enemy == null)
             {

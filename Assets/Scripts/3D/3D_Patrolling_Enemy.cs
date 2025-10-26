@@ -94,13 +94,11 @@ public class ThreeD_Patrolling_Enemy : ThreeD_Enemy
         {
             if (!isAttacking && (isChasing || inAttackRange))
             {
-                Debug.Log("[Enemy] Player is dead, stopping all combat and returning to patrol");
                 StopAllCombat();
                 ResumePatrol();
             }
             else if (isAttacking && !playerDeadDuringAttack)
             {
-                Debug.Log("[Enemy] Player died during attack, will finish current attack then stop");
                 playerDeadDuringAttack = true;
             }
 

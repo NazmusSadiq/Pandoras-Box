@@ -372,8 +372,8 @@ MonoBehaviour:
   dead: 0
   footChecker: {fileID: 2994289991097148366}
   capsuleCollider: {fileID: 5077792645990264365}
-  attackRange: 0.75
+  attackRange: 0.6
   attackVerticalOffset: 0.4
   hitSound: {fileID: 3435178492966401675}
   gameManager: {fileID: 0}
-  damageCooldown: 1
+  damageCooldown: 1.5
