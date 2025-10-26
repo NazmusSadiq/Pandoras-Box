@@ -6,8 +6,17 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Scenes/3D_GameScene.unity
-    guid: 99c9720ab356a0642a771bea13969a05
+    path: Assets/Scenes/2D_Laden/Laden_Scene.unity
+    guid: 8c9cfa26abfee488c85f1582747f6a02
+  - enabled: 1
+    path: Assets/Scenes/MainMenu.unity
+    guid: 5ac728a2fd25a1546a79045c6660f800
+  - enabled: 1
+    path: Assets/Scenes/3D/3D_GameScene.unity
+    guid: 5058544b29253874b85dcf9e5389228a
+  - enabled: 1
+    path: Assets/Scenes/2D_Hollow_Knight/Hollow_Knight_Scene.unity
+    guid: c4feede4a761ea54d8c1b2ec89df3870
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0

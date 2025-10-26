@@ -136,3 +136,6 @@ PlasticSCM/
 # ========== Local environment or testing data ==========
 /Profiles/
 /Configs/
+
+# ========== Ignore specific scene folder ==========
+/Assets/TerrainDemoScene_URP/
