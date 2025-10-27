@@ -17,6 +17,18 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/2D_Hollow_Knight/Hollow_Knight_Scene.unity
     guid: c4feede4a761ea54d8c1b2ec89df3870
+  - enabled: 1
+    path: Assets/Scenes/3D/Demo_3D_scene.unity
+    guid: b9a7d1c5352a92946844954ff695cc8f
+  - enabled: 1
+    path: Assets/Scenes/2D_Scene_2.unity
+    guid: 6bbb04ff6a9b1e74483615c4f17bff51
+  - enabled: 1
+    path: Assets/Scenes/2D_Scene_1.unity
+    guid: bc01ef1591b71124d85129da177c42df
+  - enabled: 1
+    path: Assets/Scenes/2D_Escape/2D_Scene_Escape.unity
+    guid: 4b9e987a7c86fe7418b71e49e2119159
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0

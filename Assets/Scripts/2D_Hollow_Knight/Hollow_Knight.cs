@@ -19,7 +19,7 @@ public class Hollow_Knight : MonoBehaviour
     public AudioSource hitSound = null;
 
     [Header("References")]
-    public Hollow_Knight_GameManager gameManager = null;
+    public Base_GameManager gameManager = null;
 
     [Header("Damage Cooldown")]
     [Tooltip("Seconds of invulnerability after being hit")]
@@ -60,7 +60,7 @@ public class Hollow_Knight : MonoBehaviour
 
     private void HandleInput()
     {
-        if ((Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow)) && canJump())
+        if ((Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.Space)) && canJump())
         {
             Jump();
         }
@@ -184,6 +184,15 @@ public class Hollow_Knight : MonoBehaviour
                 gameManager.Reduce_Lives();
 
             StartCoroutine(DamageCooldownRoutine());
+        }
+        else if (other.CompareTag("Bullet"))
+        {
+            if (hitSound != null)
+            {
+                hitSound.Play();
+            }
+            gameManager.Reduce_Lives();
+            Destroy(other.gameObject);
         }
     }
 

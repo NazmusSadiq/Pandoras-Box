@@ -4,7 +4,7 @@ using UnityEngine;
 public class Spike : MonoBehaviour
 {
     BoxCollider2D box_Collider = null;
-    public Hollow_Knight_GameManager gameManager = null;
+    public Base_GameManager gameManager = null;
 
     [Header("Damage Cooldown")]
     [Tooltip("Seconds the spike will be inactive after dealing damage")]

@@ -40,7 +40,12 @@ public class ThreeD_Enemy : MonoBehaviour
     public float enemyDamage = 10f;
     protected float postHitAttackLockout = 0f;
 
+    protected float comboWindowStart = 0.85f;
+    protected float comboWindowEnd = 0.99f;
+    protected float transitionDuration = 0.08f;
+
     protected bool isAttacking = false;
+    protected bool queuedCombo = false;
     protected int comboIndex = 0;
     protected float sprintAxis = 0f;
     protected float attackCooldownTimer = 0f;
@@ -62,6 +67,7 @@ public class ThreeD_Enemy : MonoBehaviour
     protected float hitStunDuration = 0.5f;
     public AudioClip hitSound;
     public AudioClip deathSound;
+    public Healthbar healthBar;
 
     protected NavMeshAgent navAgent;
     protected Animator m_Animator;
@@ -72,12 +78,17 @@ public class ThreeD_Enemy : MonoBehaviour
 
     public bool IsAware => isAware;
 
+    private void Start()
+    {
+        healthBar.UpdateHealthBar(maxHealth, health);
+    }
+
     protected bool IsPlayerDead()
     {
         return playerCharacter != null && playerCharacter.IsDead();
     }
 
-    protected void StopAllCombat()
+    virtual protected void StopAllCombat()
     {
         StopAllCoroutines();
         isAttacking = false;
@@ -86,6 +97,8 @@ public class ThreeD_Enemy : MonoBehaviour
         blocking = false;
         playerDeadDuringAttack = false;
         isAware = false;
+        queuedCombo = false;
+        comboIndex = 0;
 
         if (m_Animator != null)
         {
@@ -104,7 +117,7 @@ public class ThreeD_Enemy : MonoBehaviour
     protected void HandleDeath()
     {
         dead = true;
-        isAware = false; 
+        isAware = false;
 
         StopAllCombat();
 
@@ -176,7 +189,7 @@ public class ThreeD_Enemy : MonoBehaviour
             {
                 isChasing = false;
                 inAttackRange = false;
-                isAware = false; // NEW: No longer aware
+                isAware = false;
                 ResumePatrol();
                 return;
             }
@@ -187,7 +200,7 @@ public class ThreeD_Enemy : MonoBehaviour
             {
                 isChasing = false;
                 inAttackRange = false;
-                isAware = false; // NEW: Lost awareness
+                isAware = false;
                 ResumePatrol();
                 return;
             }
@@ -198,7 +211,7 @@ public class ThreeD_Enemy : MonoBehaviour
             {
                 isChasing = false;
                 inAttackRange = false;
-                isAware = false; // NEW: Lost awareness
+                isAware = false;
                 ResumePatrol();
                 return;
             }
@@ -335,7 +348,6 @@ public class ThreeD_Enemy : MonoBehaviour
             navAgent.speed = moveSpeed;
             navAgent.SetDestination(patrolPositions[currentPatrolIndex]);
         }
-
     }
 
     #endregion
@@ -355,7 +367,7 @@ public class ThreeD_Enemy : MonoBehaviour
         {
             isChasing = true;
             inAttackRange = false;
-            isAware = true; // NEW: Enemy becomes aware of player
+            isAware = true;
             if (navAgent != null)
             {
                 navAgent.isStopped = false;
@@ -395,14 +407,15 @@ public class ThreeD_Enemy : MonoBehaviour
     #endregion
 
     #region AI Combat System
-
     virtual protected void HandleAICombat()
     {
         if (dead || isHit || blocking) return;
 
+        // Don't attack if recently hit
         if (postHitAttackLockout > 0f)
             return;
 
+        // Don't attack if player is dead
         if (IsPlayerDead())
         {
             if (!isAttacking && inAttackRange)
@@ -413,22 +426,25 @@ public class ThreeD_Enemy : MonoBehaviour
             return;
         }
 
+        // Update attack cooldown timer
         if (attackCooldownTimer > 0f)
         {
             attackCooldownTimer -= Time.deltaTime;
         }
 
+        // Start attacking when in range, not already attacking, and cooldown is over
         if (inAttackRange && !isAttacking && attackCooldownTimer <= 0f)
         {
             StartAttack(1);
         }
     }
 
-    virtual protected void StartAttack(int index)
+    protected void StartAttack(int index)
     {
         if (index < 1 || index > maxCombo) return;
         if (isHit) return;
 
+        // Don't start attack if player is dead
         if (IsPlayerDead())
         {
             StopAllCombat();
@@ -440,6 +456,7 @@ public class ThreeD_Enemy : MonoBehaviour
         isAttacking = true;
         playerDeadDuringAttack = false;
 
+
         if (m_Animator != null)
         {
             string stateName = "Attack" + index;
@@ -447,9 +464,9 @@ public class ThreeD_Enemy : MonoBehaviour
             m_Animator.SetBool("Attack", true);
         }
 
+        // Start delayed raycast to match sword swing timing
         StartCoroutine(DelayedAttackRaycast());
     }
-
     virtual protected IEnumerator DelayedAttackRaycast()
     {
         yield return new WaitForSeconds(attackDelay);
@@ -486,6 +503,7 @@ public class ThreeD_Enemy : MonoBehaviour
                 if (!playerCharacter.IsBlocking())
                 {
                     playerCharacter.GetHit(enemyDamage);
+                    AudioSource.PlayClipAtPoint(hitSound, transform.position);
                 }
                 else
                 {
@@ -534,33 +552,19 @@ public class ThreeD_Enemy : MonoBehaviour
         player.rotation = targetRotation;
     }
 
+    // SIMPLIFIED COMBO SYSTEM - Follows your working character pattern
     virtual protected void UpdateComboStateMachine()
     {
         if (!isAttacking) return;
         if (m_Animator == null) return;
 
-        // Check if player moved out of attack range during combo
-        if (player != null && Vector3.Distance(transform.position, player.position) > attackRange)
-        {
-            EndCombo();
-            if (isChasing && !IsPlayerDead())
-            {
-                // Resume chasing if player is still alive and in chase range
-                inAttackRange = false;
-                if (navAgent != null)
-                {
-                    navAgent.isStopped = false;
-                    navAgent.SetDestination(player.position);
-                }
-            }
-            return;
-        }
-
         AnimatorStateInfo state = m_Animator.GetCurrentAnimatorStateInfo(0);
         float normalizedTime = state.normalizedTime;
 
+        // Check if current attack animation has finished
         if (normalizedTime >= 1.0f)
         {
+            // If player died during this attack, stop the combo and return to patrol
             if (playerDeadDuringAttack || IsPlayerDead())
             {
                 EndCombo();
@@ -568,47 +572,33 @@ public class ThreeD_Enemy : MonoBehaviour
                 return;
             }
 
-            // Check again if player is still in range before starting next combo attack
-            if (player != null && Vector3.Distance(transform.position, player.position) <= attackRange)
+            // If we have more attacks in the combo, go to next one
+            if (comboIndex < maxCombo)
             {
-                if (comboIndex < maxCombo)
-                {
-                    comboIndex++;
-                    StartAttack(comboIndex);
-                }
-                else
-                {
-                    EndCombo();
-                }
+                comboIndex++;
+                StartAttack(comboIndex);
             }
             else
             {
-                // Player moved out of range during combo transition
                 EndCombo();
-                if (isChasing && !IsPlayerDead())
-                {
-                    inAttackRange = false;
-                    if (navAgent != null)
-                    {
-                        navAgent.isStopped = false;
-                        navAgent.SetDestination(player.position);
-                    }
-                }
             }
         }
     }
+
     protected void EndCombo()
     {
         isAttacking = false;
         comboIndex = 0;
         playerDeadDuringAttack = false;
 
+        // Start cooldown after finishing combo
         attackCooldownTimer = attackCooldown;
 
         if (m_Animator != null)
         {
             m_Animator.SetBool("Attack", false);
         }
+
     }
 
     #endregion
@@ -651,10 +641,12 @@ public class ThreeD_Enemy : MonoBehaviour
         if (isHit || dead) return;
 
         health -= damage;
+        healthBar.UpdateHealthBar(maxHealth, health);
 
         if (health <= 0)
         {
             health = 0;
+            Destroy(healthBar.gameObject);
             HandleDeath();
             return;
         }
@@ -671,7 +663,7 @@ public class ThreeD_Enemy : MonoBehaviour
         {
             isChasing = true;
             inAttackRange = false;
-            isAware = true; 
+            isAware = true;
 
             if (navAgent != null)
             {
@@ -682,6 +674,7 @@ public class ThreeD_Enemy : MonoBehaviour
         }
 
         isAttacking = false;
+        queuedCombo = false;
 
         if (m_Animator != null)
         {
@@ -776,7 +769,7 @@ public class ThreeD_Enemy : MonoBehaviour
     {
         if (dead) return false;
 
-        blocking = (UnityEngine.Random.value > (1-blockChance)) && isAware;
+        blocking = (UnityEngine.Random.value > (1 - blockChance)) && isAware;
 
         if (blocking)
         {

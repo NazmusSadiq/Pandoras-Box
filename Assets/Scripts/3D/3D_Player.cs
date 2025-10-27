@@ -43,8 +43,10 @@ public class ThreeD_Character : MonoBehaviour
     private bool isHit = false;
 
     [Header("Health")]
-    public float Health = 100f;
+    public float max_Health = 100f;
+    private float cur_Health;
     public bool dead = false;
+    public Healthbar healthBar;
 
     private Animator m_Animator;
     private CharacterController controller;
@@ -62,6 +64,7 @@ public class ThreeD_Character : MonoBehaviour
     {
         m_Animator = GetComponent<Animator>();
         controller = GetComponent<CharacterController>();
+        cur_Health = max_Health;
         if (controller == null)
         {
             controller = gameObject.AddComponent<CharacterController>();
@@ -78,7 +81,11 @@ public class ThreeD_Character : MonoBehaviour
             cameraYaw = angles.y;
             cameraPitch = angles.x;
         }
-    }
+        if (healthBar != null)
+        {
+            healthBar.UpdateHealthBar(max_Health, cur_Health);
+        }
+}
 
     void Update()
     {
@@ -279,12 +286,47 @@ public class ThreeD_Character : MonoBehaviour
     {
         if (index < 1 || index > maxCombo || dead) return;
 
+        // Auto-rotate to face the closest enemy when starting an attack
+        RotateToClosestEnemy();
+
         string stateName = "Attack" + index;
         m_Animator.CrossFade(stateName, transitionDuration, 0);
 
         DoAttackRaycast();
         isAttacking = true;
         queuedCombo = false;
+    }
+
+    private void RotateToClosestEnemy()
+    {
+        // Find all enemies in the scene
+        ThreeD_Enemy[] allEnemies = FindObjectsOfType<ThreeD_Enemy>();
+        ThreeD_Enemy closestEnemy = null;
+        float closestDistance = Mathf.Infinity;
+
+        foreach (ThreeD_Enemy enemy in allEnemies)
+        {
+            if (enemy.IsDead()) continue;
+
+            float distance = Vector3.Distance(transform.position, enemy.transform.position);
+            if (distance <= attackRayDistance && distance < closestDistance)
+            {
+                closestDistance = distance;
+                closestEnemy = enemy;
+            }
+        }
+
+        // If we found a close enemy, rotate to face it
+        if (closestEnemy != null)
+        {
+            Vector3 directionToEnemy = (closestEnemy.transform.position - transform.position).normalized;
+            directionToEnemy.y = 0f; // Keep rotation horizontal
+
+            if (directionToEnemy.sqrMagnitude > 0.0001f)
+            {
+                transform.rotation = Quaternion.LookRotation(directionToEnemy);
+            }
+        }
     }
 
     private void DoAttackRaycast()
@@ -296,8 +338,10 @@ public class ThreeD_Character : MonoBehaviour
 
         if (Physics.Raycast(origin, dir, out RaycastHit hit, attackRayDistance, attackHitMask))
         {
-            ThreeD_Enemy enemy = hit.collider.transform.root.GetComponent<ThreeD_Enemy>();
-            if(enemy == null)
+            Debug.Log(hit.collider);
+            Debug.Log(hit.collider.transform.root);
+            ThreeD_Enemy enemy = hit.collider.GetComponentInParent<ThreeD_Enemy>();
+            if (enemy == null)
             {
                 enemy = hit.collider.transform.root.root.GetComponent<ThreeD_Enemy>();
             }
@@ -312,10 +356,6 @@ public class ThreeD_Character : MonoBehaviour
                     enemy.PlayBlockingSound();
                 }
                 MakeEnemyFacePlayer(enemy);                 
-            }
-            else if (hit.collider.gameObject != this.gameObject)
-            {
-                Destroy(hit.collider.gameObject);
             }
         }
 
@@ -396,11 +436,15 @@ public class ThreeD_Character : MonoBehaviour
     public void GetHit(float amount)
     {
         if (isHit || dead) return;
-        Health -= amount;
-
-        if (Health <= 0)
+        cur_Health -= amount;
+        if (healthBar)
         {
-            Health = 0;
+            healthBar.UpdateHealthBar(max_Health, cur_Health);
+        }
+
+        if (cur_Health <= 0)
+        {
+            cur_Health = 0;
             HandleDeath();
             return;
         }

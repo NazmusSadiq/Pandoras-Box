@@ -17,7 +17,7 @@ public class Finish_Line : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        if (other.CompareTag("Player"))
+        if (other.CompareTag("Player") && gameManager.CanProceed())
         {
             gameManager.Finish_Game();
         }

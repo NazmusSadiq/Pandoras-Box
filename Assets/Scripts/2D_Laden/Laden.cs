@@ -11,7 +11,7 @@ public class Laden : MonoBehaviour
     public BoxCollider2D footChecker = null;
     public CapsuleCollider2D capsuleCollider = null;
     public GameObject planePrefab;
-    public Laden_GameManager gameManager = null;
+    public Base_GameManager gameManager = null;
     public float planeSpeed = 10f;
     public AudioSource hitSound = null;
     private Animator m_Animator;
@@ -47,16 +47,16 @@ public class Laden : MonoBehaviour
     private void HandleInput()
     {
         // Jump → W or Up Arrow
-        if ((Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow)) && canJumpOrCrawl())
+        if ((Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.Space)) && canJumpOrCrawl())
         {
             Jump();
         }
 
         // Crawl → S or Down Arrow
-        else if ((Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow)) && canJumpOrCrawl())
-        {
-            Crawl();
-        }
+        //else if ((Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow)) && canJumpOrCrawl())
+        //{
+        //    Crawl();
+        //}
 
         // Stop crawling when key is released
         if (Input.GetKeyUp(KeyCode.S) || Input.GetKeyUp(KeyCode.DownArrow))
@@ -127,11 +127,11 @@ public class Laden : MonoBehaviour
         shooting = false;
     }
 
-    public void Crawl()
-    {
-        jumping = false;
-        crawling = true;
-    }
+    //public void Crawl()
+    //{
+    //    jumping = false;
+    //    crawling = true;
+    //}
 
     public void Move()
     {

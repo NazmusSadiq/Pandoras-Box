@@ -7,7 +7,7 @@ public class T_Tower : MonoBehaviour
     public bool right_direction;         
     public float bulletSpeed = 5f;   
     public BoxCollider2D box_Collider = null;
-    public Laden_GameManager gameManager = null;
+    public Base_GameManager gameManager = null;
 
     private float shootTimer = 0f;
 
@@ -57,7 +57,7 @@ public class T_Tower : MonoBehaviour
         {
             Destroy(transform.gameObject);
             Destroy(other.gameObject);
-            gameManager.Destroy_Tower();
+            gameManager.Destroy_Enemy();
         }
     }
 }

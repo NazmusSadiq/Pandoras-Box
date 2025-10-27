@@ -64,6 +64,16 @@ public class SubSceneTrigger : MonoBehaviour
 
     private bool CanProceedFromHere(Collider who)
     {
+        ThreeD_Enemy[] enemies = FindObjectsOfType<ThreeD_Enemy>();
+
+        foreach (ThreeD_Enemy enemy in enemies)
+        {
+            if (enemy != null && enemy.GetAwarenessState() && !enemy.IsDead())
+            {
+                Debug.Log("Cannot proceed - enemy is still aware of player");
+                return false;
+            }
+        }
         return !hasCompleted;
     }
 }
